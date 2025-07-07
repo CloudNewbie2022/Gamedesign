@@ -1,70 +1,130 @@
-# Getting Started with Create React App
+# Habit Stock Tracker
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A gamified habit tracking application that treats your daily habits like stocks in a portfolio. Track your reading progress, exercise routines, and other habits with beautiful visualizations and real-time mood indicators.
 
-## Available Scripts
+## Features
 
-In the project directory, you can run:
+### 🎯 Core Components
 
-### `npm start`
+- **TickerHeatMap**: Visual stock-like tickers showing habit performance with color-coded intensity
+- **HabitCard**: Individual habit cards with progress bars and icons
+- **MoodIndicator**: Emotional feedback based on portfolio performance
+- **PlayerCard**: Complete player profiles with charts and statistics
+- **Dark Mode**: Seamless theme switching with persistent preferences
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+### 📊 Visual Elements
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+- **Stock-like Interface**: Habits are displayed as stock tickers with green/red color coding
+- **Progress Charts**: Interactive line charts showing habit progress over time
+- **Mood System**: Emoji-based mood indicators that change based on performance
+- **Responsive Design**: Works beautifully on desktop, tablet, and mobile devices
 
-### `npm test`
+### 🎮 Gamification Features
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- **Portfolio Performance**: Track overall habit performance like a stock portfolio
+- **Streak Tracking**: Monitor consecutive days of habit completion
+- **Performance Metrics**: Calculate percentage changes and trends
+- **Multi-Player Support**: Track multiple players/participants
 
-### `npm run build`
+## Getting Started
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Prerequisites
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+- Node.js (v14 or higher)
+- npm or yarn
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### Installation
 
-### `npm run eject`
+1. Install dependencies:
+```bash
+npm install
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+2. Start the development server:
+```bash
+npm start
+```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+3. Start the backend server (in a separate terminal):
+```bash
+cd ..
+node server.js
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+The application will be available at `http://localhost:3000`
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## Usage
 
-## Learn More
+### Adding Habit Progress
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+1. Click on any player card to select them
+2. Click on the habit tickers or cards to add progress
+3. Enter the number of pages read (or other metric)
+4. Click "Add Progress" to save
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+### Understanding the Interface
 
-### Code Splitting
+- **Green Tickers**: Positive performance (above average)
+- **Red Tickers**: Below average performance
+- **Intensity**: Color intensity indicates how far above/below average
+- **Mood Indicator**: Overall emotional state based on recent performance
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+### Dark Mode
 
-### Analyzing the Bundle Size
+Click the sun/moon icon in the top-right corner to toggle between light and dark themes. Your preference is automatically saved.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+## Component Architecture
 
-### Making a Progressive Web App
+```
+src/
+├── components/
+│   ├── HabitTracker.js          # Main application component
+│   └── ui/
+│       ├── TickerHeatMap.js     # Stock-like habit tickers
+│       ├── HabitCard.js         # Individual habit cards
+│       ├── MoodIndicator.js     # Emotional feedback
+│       ├── PlayerCard.js        # Player profiles
+│       ├── HabitChart.js        # Progress charts
+│       ├── ThemeProvider.js     # Dark/light mode management
+│       └── DarkModeToggle.js    # Theme toggle button
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+## Customization
 
-### Advanced Configuration
+### Adding New Habit Types
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+1. Update the `ICONS` object in `HabitCard.js`
+2. Add corresponding CSS variables in `index.css`
+3. Update the Tailwind config colors if needed
 
-### Deployment
+### Styling
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+The application uses Tailwind CSS for styling. Custom colors and themes can be modified in:
+- `tailwind.config.js` - Color definitions
+- `src/index.css` - CSS variables and base styles
 
-### `npm run build` fails to minify
+## API Integration
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+The application connects to a backend API at `http://localhost:4000` with the following endpoints:
+
+- `GET /players` - Fetch all players and their habit data
+- `POST /update-habit` - Add new habit progress for a player
+
+## Technologies Used
+
+- **React 19** - Modern React with hooks
+- **Tailwind CSS** - Utility-first CSS framework
+- **Chart.js** - Interactive charts and graphs
+- **Axios** - HTTP client for API calls
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## License
+
+This project is open source and available under the MIT License.
