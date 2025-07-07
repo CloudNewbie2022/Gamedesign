@@ -25,7 +25,9 @@ let players = [
 // Helper: calculate price (pages read of last entry)
 function getCurrentPrice(player) {
   const hist = player.habitHistory;
-  return hist.length ? hist[hist.length - 1].pages : 0;
+  // Ensure minimum price of 1 to prevent zero-price exploit
+  const lastPages = hist.length ? hist[hist.length - 1].pages : 0;
+  return Math.max(lastPages, 1);
 }
 
 // Helper function to define endpoints
@@ -36,36 +38,94 @@ function defineEndpoint(path, method, handler) {
 // Update habit data
 defineEndpoint('/update-habit', 'post', (req, res) => {
   const { playerId, date, pages } = req.body;
+  
+  // Input validation
+  if (!playerId || !date || pages === undefined || pages === null) {
+    return res.status(400).send('Missing required fields: playerId, date, pages');
+  }
+  
+  const parsedPages = parseInt(pages, 10);
+  if (isNaN(parsedPages) || parsedPages < 0) {
+    return res.status(400).send('Pages must be a non-negative number');
+  }
+  
   const player = players.find(p => p.id === playerId);
   if (!player) return res.status(404).send('Player not found');
-  player.habitHistory.push({ date, pages });
+  
+  // Check for existing entry on the same date
+  const existingEntryIndex = player.habitHistory.findIndex(h => h.date === date);
+  
+  if (existingEntryIndex !== -1) {
+    // Update existing entry by adding pages (allows multiple reading sessions per day)
+    player.habitHistory[existingEntryIndex].pages += parsedPages;
+  } else {
+    // Create new entry for new date
+    player.habitHistory.push({ date, pages: parsedPages });
+  }
+  
   res.json(player);
 });
 
 // Buy shares
 defineEndpoint('/buy', 'post', (req, res) => {
   const { playerId, amount } = req.body;
+  
+  // Input validation
+  if (!playerId || amount === undefined || amount === null) {
+    return res.status(400).send('Missing required fields: playerId, amount');
+  }
+  
+  const parsedAmount = parseInt(amount, 10);
+  if (isNaN(parsedAmount) || parsedAmount <= 0) {
+    return res.status(400).send('Amount must be a positive number');
+  }
+  
   const player = players.find(p => p.id === playerId);
   if (!player) return res.status(404).send('Player not found');
+  
   const price = getCurrentPrice(player);
-  const cost = price * amount;
-  if (player.cash < cost) return res.status(400).send('Insufficient cash');
+  const cost = price * parsedAmount;
+  
+  if (player.cash < cost) {
+    return res.status(400).send(`Insufficient cash. Cost: $${cost}, Available: $${player.cash}`);
+  }
+  
   player.cash -= cost;
-  player.shares.push({ purchaseDate: new Date().toISOString(), purchasePrice: price, amount });
+  player.shares.push({ 
+    purchaseDate: new Date().toISOString(), 
+    purchasePrice: price, 
+    amount: parsedAmount 
+  });
   res.json(player);
 });
 
 // Sell shares
 defineEndpoint('/sell', 'post', (req, res) => {
   const { playerId, shareIndex } = req.body;
+  
+  // Input validation
+  if (!playerId || shareIndex === undefined || shareIndex === null) {
+    return res.status(400).send('Missing required fields: playerId, shareIndex');
+  }
+  
+  const parsedIndex = parseInt(shareIndex, 10);
+  if (isNaN(parsedIndex) || parsedIndex < 0) {
+    return res.status(400).send('ShareIndex must be a non-negative number');
+  }
+  
   const player = players.find(p => p.id === playerId);
   if (!player) return res.status(404).send('Player not found');
-  const share = player.shares[shareIndex];
-  if (!share) return res.status(400).send('Share not found');
+  
+  if (parsedIndex >= player.shares.length) {
+    return res.status(400).send(`Invalid share index. Player has ${player.shares.length} shares`);
+  }
+  
+  const share = player.shares[parsedIndex];
   const price = getCurrentPrice(player);
   const revenue = price * share.amount;
+  
   player.cash += revenue;
-  player.shares.splice(shareIndex, 1);
+  player.shares.splice(parsedIndex, 1);
   res.json(player);
 });
 
