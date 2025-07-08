@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
+import { DarkModeContext } from '../App';
 import './Login.css';
 
 const Login = ({ onLogin }) => {
@@ -9,6 +10,7 @@ const Login = ({ onLogin }) => {
   const [success, setSuccess] = useState('');
   const [genres, setGenres] = useState([]);
   const [loadingGenres, setLoadingGenres] = useState(false);
+  const darkMode = useContext(DarkModeContext);
 
   // Form fields
   const [formData, setFormData] = useState({
@@ -287,8 +289,8 @@ const Login = ({ onLogin }) => {
   };
 
   return (
-    <div className="login-container">
-      <div className="login-card">
+    <div className={`login-container ${darkMode ? 'dark' : ''}`}>
+      <div className={`login-card ${darkMode ? 'dark' : ''}`}>
         <div className="login-header">
           <h1>Rally Reader</h1>
           <p>Stock Market Reading Game</p>

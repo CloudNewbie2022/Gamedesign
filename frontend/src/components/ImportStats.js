@@ -47,8 +47,8 @@ const INSTRUCTIONS = (
   </div>
 );
 
-// Add a dark mode context (or prop)
-const DarkModeContext = React.createContext(false);
+// Import the DarkModeContext from App.js
+import { DarkModeContext } from '../App';
 
 const ImportStats = ({ onSave }) => {
   const [dailyPages, setDailyPages] = useState(Array(DAYS_REQUIRED).fill(''));
@@ -202,77 +202,144 @@ const ImportStats = ({ onSave }) => {
   );
 
   return (
-    <div className={`import-stats-fluffy${darkMode ? ' dark' : ''}`}>
+    <div className={`import-stats-fluffy ${darkMode ? 'dark' : ''}`}>
       <div className="import-header">
-        <span className="import-title">📚 Import Your Reading Stats</span>
-        <span className="import-help" onClick={() => setShowInstructions(true)} title="How to use this page">?</span>
-      </div>
-      <div style={{textAlign:'right',marginBottom:16}}>
-        <button className="sg-connect-btn" onClick={() => setShowSGModal(true)}>Connect StoryGraph</button>
-      </div>
-      {showSGModal && (
-        <div className="import-modal-bg" onClick={() => setShowSGModal(false)}>
-          <div className="import-modal" onClick={e => e.stopPropagation()}>
-            <span className="import-modal-close" onClick={() => setShowSGModal(false)}>×</span>
-            <h2>Connect to StoryGraph</h2>
-            <form onSubmit={handleSGImport} className="sg-form">
-              <label>Email:</label>
-              <input type="email" value={sgEmail} onChange={e => setSgEmail(e.target.value)} required autoFocus />
-              <label>Password:</label>
-              <input type="password" value={sgPassword} onChange={e => setSgPassword(e.target.value)} required />
-              {sgError && <div className="error">{sgError}</div>}
-              <button type="submit" disabled={sgLoading}>{sgLoading ? 'Importing...' : 'Import from StoryGraph'}</button>
-            </form>
-          </div>
+        <h1 className="import-title">Import Reading Statistics</h1>
+        <div 
+          className="import-help" 
+          onClick={() => setShowInstructions(!showInstructions)}
+          title="Show/Hide Instructions"
+        >
+          ?
         </div>
-      )}
+      </div>
+
       {showInstructions && (
         <div className="import-modal-bg" onClick={() => setShowInstructions(false)}>
-          <div className={`import-modal${darkMode ? ' dark' : ''}`} onClick={e => e.stopPropagation()}>
-            <span className="import-modal-close" onClick={() => setShowInstructions(false)}>×</span>
-            <div className="import-instructions-scrollable">{INSTRUCTIONS}</div>
+          <div className={`import-modal ${darkMode ? 'dark' : ''}`} onClick={e => e.stopPropagation()}>
+            <div className="import-modal-close" onClick={() => setShowInstructions(false)}>×</div>
+            <div className="import-instructions-scrollable">
+              {INSTRUCTIONS}
+            </div>
           </div>
         </div>
       )}
-      <div className="import-section cloud-box">
-        <h3>Quick Import via CSV</h3>
-        <input type="file" accept=".csv" onChange={handleCsvUpload} />
-        {csvError && <div className="error">{csvError}</div>}
-      </div>
-      <div className="import-section cloud-box">
-        <h3>Quick Import via Screenshot</h3>
-        <input type="file" accept="image/*" onChange={handleImageUpload} />
-        {ocrLoading && <div>Processing image...</div>}
-        {ocrError && <div className="error">{ocrError}</div>}
-      </div>
-      <div className="import-section cloud-box">
-        <h3>Manual Entry (90 days required)</h3>
-        <div className="calendar-cloud">
-          {calendarGrid}
+
+      <div className="import-section">
+        <div className="cloud-box">
+          <h3>📊 CSV Import (StoryGraph, Goodreads, etc.)</h3>
+          <p>Upload a CSV file with your reading data</p>
+          <input
+            type="file"
+            accept=".csv"
+            onChange={handleCsvUpload}
+            style={{ marginTop: '0.5em' }}
+          />
+          {csvError && <div className="error">{csvError}</div>}
         </div>
-        <div className="progress-bar-bg">
-          <div className="progress-bar" style={{width: `${(progress/DAYS_REQUIRED)*100}%`}}></div>
+
+        <div className="cloud-box">
+          <h3>📸 Screenshot OCR Import</h3>
+          <p>Upload a screenshot of your reading stats for automatic text recognition</p>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
+            style={{ marginTop: '0.5em' }}
+          />
+          {ocrLoading && <div>Processing image...</div>}
+          {ocrError && <div className="error">{ocrError}</div>}
         </div>
-        <div className="progress-label">Progress: {progress} / {DAYS_REQUIRED} days</div>
-      </div>
-      <div className="import-section cloud-box">
-        <h3>Review & Edit</h3>
-        <div className="review-fields">
-          <label>Books Read: </label>
-          <input type="number" value={booksRead} onChange={e => setBooksRead(e.target.value)} disabled={manualLocked} />
-          <label>Pages Read: </label>
-          <input type="number" value={pagesRead} onChange={e => setPagesRead(e.target.value)} disabled={manualLocked} />
-        </div>
+
         {preview && (
           <div className="preview-box">
-            <b>Preview:</b>
-            <div>Books: <input type="number" value={preview.booksRead} onChange={e => setPreview({...preview, booksRead: e.target.value})} /></div>
-            <div>Pages: <input type="number" value={preview.pagesRead} onChange={e => setPreview({...preview, pagesRead: e.target.value})} /></div>
-            <div>Daily: <span style={{fontSize:'0.9em'}}>{preview.dailyPages.slice(0,7).join(', ')} ...</span></div>
+            <h3>📋 Import Preview</h3>
+            <div className="review-fields">
+              <label>Books Read:</label>
+              <input
+                type="number"
+                value={preview.booksRead}
+                onChange={e => setBooksRead(e.target.value)}
+                placeholder="0"
+              />
+            </div>
+            <div className="review-fields">
+              <label>Pages Read:</label>
+              <input
+                type="number"
+                value={preview.pagesRead}
+                onChange={e => setPagesRead(e.target.value)}
+                placeholder="0"
+              />
+            </div>
           </div>
         )}
-        <button onClick={handleSave} disabled={manualLocked}>Save Stats</button>
-        {manualLocked && <div style={{color: 'orange'}}>Enter 90 days of daily data to unlock manual fields.</div>}
+
+        <div className="cloud-box">
+          <h3>📅 Manual Entry (90 Days Required)</h3>
+          <p>Enter your daily pages read for the last 90 days</p>
+          
+          <div className="calendar-cloud">
+            {calendarGrid}
+          </div>
+
+          <div className="progress-section">
+            <div className="progress-label">
+              Progress: {progress} / {DAYS_REQUIRED} days completed
+            </div>
+            <div className="progress-bar-bg">
+              <div 
+                className="progress-bar" 
+                style={{ 
+                  width: `${(progress / DAYS_REQUIRED) * 100}%`,
+                  background: progress === DAYS_REQUIRED 
+                    ? 'linear-gradient(90deg, #4CAF50 0%, #45a049 100%)' 
+                    : 'linear-gradient(90deg, #61dafb 0%, #4fa8d1 100%)'
+                }}
+              />
+            </div>
+            {progress === DAYS_REQUIRED && (
+              <div style={{ color: '#4CAF50', fontWeight: 'bold', marginTop: '0.5em' }}>
+                ✅ All 90 days completed! You can now enter totals below.
+              </div>
+            )}
+          </div>
+
+          <div className="review-fields" style={{ marginTop: '1em' }}>
+            <label>Books Read:</label>
+            <input
+              type="number"
+              value={booksRead}
+              onChange={e => setBooksRead(e.target.value)}
+              placeholder="0"
+              disabled={manualLocked}
+            />
+          </div>
+          <div className="review-fields">
+            <label>Pages Read:</label>
+            <input
+              type="number"
+              value={pagesRead}
+              onChange={e => setPagesRead(e.target.value)}
+              placeholder="0"
+              disabled={manualLocked}
+            />
+          </div>
+        </div>
+
+        <button 
+          onClick={handleSave}
+          disabled={!booksRead || !pagesRead || progress < DAYS_REQUIRED}
+          style={{ 
+            width: '100%', 
+            marginTop: '2em',
+            padding: '1em',
+            fontSize: '1.1rem',
+            fontWeight: 'bold'
+          }}
+        >
+          Save Stats & Unlock Game
+        </button>
       </div>
     </div>
   );

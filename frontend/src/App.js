@@ -49,7 +49,7 @@ function Readers({ user }) {
         ))}
       </ul>
       {/* Placeholder for 30-day graph */}
-      <div style={{marginTop: 24, background: '#fff', borderRadius: 8, padding: 16}}>
+      <div style={{marginTop: 24, background: 'var(--surface-color)', borderRadius: 8, padding: 16, border: '1px solid var(--border-color)'}}>
         <b>30-Day Reading Graph (Coming Soon)</b>
       </div>
     </div>
@@ -90,6 +90,24 @@ function App() {
     }
     setLoading(false);
   }, []);
+
+  // Apply dark mode theme to document root
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+  }, [darkMode]);
+
+  // Apply dark mode theme to document root
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+  }, [darkMode]);
 
   const handleLogin = (userData) => {
     setUser(userData);

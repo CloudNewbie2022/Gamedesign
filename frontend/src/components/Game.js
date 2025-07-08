@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import axios from 'axios';
 import { Line } from 'react-chartjs-2';
 import 'chart.js/auto';
+import { DarkModeContext } from '../App';
 import './Game.css';
 import ImportStats from './ImportStats';
 import '../components/ImportStats.css';
@@ -18,6 +19,7 @@ const Game = ({ user, onLogout }) => {
   const [showImport, setShowImport] = useState(false);
   const [importMsg, setImportMsg] = useState('');
   const [importStats, setImportStats] = useState(user.stats || null);
+  const darkMode = useContext(DarkModeContext);
 
   // Fetch users for trading
   useEffect(() => {
@@ -239,7 +241,7 @@ const Game = ({ user, onLogout }) => {
   }
 
   return (
-    <div className="game-container">
+    <div className={`game-container ${darkMode ? 'dark' : ''}`}>
       <header className="game-header">
         <div className="header-left">
           <h1>Habit Stock Game</h1>
