@@ -64,6 +64,10 @@ let posts = [
   }
 ];
 
+// Chat conversations store
+let conversations = [];
+let chatMessages = [];
+
 // Book data cache (from StoryGraph API)
 let booksCache = {};
 
@@ -603,6 +607,254 @@ defineEndpoint('/storygraph/import', 'post', async (req, res) => {
     res.status(500).json({ error: 'Failed to import StoryGraph CSV data' });
   }
 });
+
+// Enhanced Player Profile Endpoints
+
+// Get player profile by ID
+defineEndpoint('/players/:playerId', 'get', (req, res) => {
+  const { playerId } = req.params;
+  const player = players.find(p => p.id === playerId);
+  
+  if (!player) return res.status(404).send('Player not found');
+  
+  // Calculate additional profile stats
+  const totalPages = player.habitHistory.reduce((sum, h) => sum + h.pages, 0);
+  const currentPrice = getCurrentPrice(player);
+  const totalValue = player.shares.reduce((sum, share) => sum + (share.amount * currentPrice), 0);
+  const readingStreak = calculateReadingStreak(player.habitHistory);
+  const favoriteBooks = getFavoriteBooks(player.habitHistory);
+  
+  const enhancedProfile = {
+    ...player,
+    stats: {
+      totalPages,
+      currentPrice,
+      totalValue,
+      readingStreak,
+      booksRead: favoriteBooks.length,
+      averagePages: totalPages / Math.max(player.habitHistory.length, 1),
+      followersCount: player.followers.length,
+      followingCount: player.following.length
+    },
+    favoriteBooks,
+    recentActivity: getRecentActivity(playerId)
+  };
+  
+  res.json(enhancedProfile);
+});
+
+// Get player feed (posts by a specific player)
+defineEndpoint('/players/:playerId/feed', 'get', (req, res) => {
+  const { playerId } = req.params;
+  const player = players.find(p => p.id === playerId);
+  
+  if (!player) return res.status(404).send('Player not found');
+  
+  const playerPosts = posts.filter(post => post.playerId === playerId);
+  const enrichedPosts = playerPosts.map(post => ({
+    ...post,
+    player: player
+  }));
+  
+  res.json(enrichedPosts);
+});
+
+// Chat Endpoints
+
+// Get or create conversation between two players
+defineEndpoint('/chat/conversations', 'post', (req, res) => {
+  const { playerId1, playerId2 } = req.body;
+  
+  if (!playerId1 || !playerId2) {
+    return res.status(400).send('Missing required fields: playerId1, playerId2');
+  }
+  
+  if (playerId1 === playerId2) {
+    return res.status(400).send('Cannot create conversation with yourself');
+  }
+  
+  // Check if conversation already exists
+  let conversation = conversations.find(c => 
+    (c.participants.includes(playerId1) && c.participants.includes(playerId2))
+  );
+  
+  if (!conversation) {
+    conversation = {
+      id: `conv_${Date.now()}`,
+      participants: [playerId1, playerId2],
+      createdAt: new Date().toISOString(),
+      lastMessageAt: new Date().toISOString()
+    };
+    conversations.push(conversation);
+  }
+  
+  res.json(conversation);
+});
+
+// Get all conversations for a player
+defineEndpoint('/chat/conversations/:playerId', 'get', (req, res) => {
+  const { playerId } = req.params;
+  
+  const playerConversations = conversations.filter(c => 
+    c.participants.includes(playerId)
+  );
+  
+  // Enrich with participant info and last message
+  const enrichedConversations = playerConversations.map(conv => {
+    const otherParticipantId = conv.participants.find(id => id !== playerId);
+    const otherParticipant = players.find(p => p.id === otherParticipantId);
+    const lastMessage = chatMessages
+      .filter(m => m.conversationId === conv.id)
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+    
+    return {
+      ...conv,
+      otherParticipant,
+      lastMessage,
+      unreadCount: chatMessages.filter(m => 
+        m.conversationId === conv.id && 
+        m.senderId !== playerId && 
+        !m.readBy.includes(playerId)
+      ).length
+    };
+  });
+  
+  res.json(enrichedConversations);
+});
+
+// Send a message
+defineEndpoint('/chat/messages', 'post', (req, res) => {
+  const { conversationId, senderId, content } = req.body;
+  
+  if (!conversationId || !senderId || !content) {
+    return res.status(400).send('Missing required fields: conversationId, senderId, content');
+  }
+  
+  const conversation = conversations.find(c => c.id === conversationId);
+  if (!conversation) return res.status(404).send('Conversation not found');
+  
+  if (!conversation.participants.includes(senderId)) {
+    return res.status(403).send('You are not a participant in this conversation');
+  }
+  
+  const message = {
+    id: `msg_${Date.now()}`,
+    conversationId,
+    senderId,
+    content: content.trim(),
+    timestamp: new Date().toISOString(),
+    readBy: [senderId] // Sender has read their own message
+  };
+  
+  chatMessages.push(message);
+  
+  // Update conversation last message time
+  conversation.lastMessageAt = message.timestamp;
+  
+  res.json(message);
+});
+
+// Get messages for a conversation
+defineEndpoint('/chat/conversations/:conversationId/messages', 'get', (req, res) => {
+  const { conversationId } = req.params;
+  const { playerId } = req.query;
+  
+  const conversation = conversations.find(c => c.id === conversationId);
+  if (!conversation) return res.status(404).send('Conversation not found');
+  
+  if (playerId && !conversation.participants.includes(playerId)) {
+    return res.status(403).send('You are not a participant in this conversation');
+  }
+  
+  const messages = chatMessages
+    .filter(m => m.conversationId === conversationId)
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+    .map(msg => ({
+      ...msg,
+      sender: players.find(p => p.id === msg.senderId)
+    }));
+  
+  res.json(messages);
+});
+
+// Mark messages as read
+defineEndpoint('/chat/messages/read', 'post', (req, res) => {
+  const { conversationId, playerId } = req.body;
+  
+  if (!conversationId || !playerId) {
+    return res.status(400).send('Missing required fields: conversationId, playerId');
+  }
+  
+  const conversation = conversations.find(c => c.id === conversationId);
+  if (!conversation) return res.status(404).send('Conversation not found');
+  
+  if (!conversation.participants.includes(playerId)) {
+    return res.status(403).send('You are not a participant in this conversation');
+  }
+  
+  // Mark all messages in conversation as read by this player
+  chatMessages
+    .filter(m => m.conversationId === conversationId && !m.readBy.includes(playerId))
+    .forEach(m => m.readBy.push(playerId));
+  
+  res.json({ message: 'Messages marked as read' });
+});
+
+// Helper functions for profile stats
+function calculateReadingStreak(habitHistory) {
+  if (habitHistory.length === 0) return 0;
+  
+  const sortedHistory = habitHistory
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+  
+  let streak = 0;
+  let currentDate = new Date();
+  
+  for (const entry of sortedHistory) {
+    const entryDate = new Date(entry.date);
+    const daysDiff = Math.floor((currentDate - entryDate) / (1000 * 60 * 60 * 24));
+    
+    if (daysDiff <= streak + 1) {
+      if (entry.pages > 0) streak++;
+      currentDate = entryDate;
+    } else {
+      break;
+    }
+  }
+  
+  return streak;
+}
+
+function getFavoriteBooks(habitHistory) {
+  const bookCounts = {};
+  habitHistory.forEach(entry => {
+    if (entry.book) {
+      bookCounts[entry.book] = (bookCounts[entry.book] || 0) + entry.pages;
+    }
+  });
+  
+  return Object.entries(bookCounts)
+    .sort(([,a], [,b]) => b - a)
+    .slice(0, 5)
+    .map(([book, pages]) => ({ book, pages }));
+}
+
+function getRecentActivity(playerId) {
+  const recentPosts = posts
+    .filter(post => post.playerId === playerId)
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+    .slice(0, 3);
+  
+  const player = players.find(p => p.id === playerId);
+  const recentHabits = player ? player.habitHistory
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 3) : [];
+  
+  return {
+    recentPosts,
+    recentHabits
+  };
+}
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));

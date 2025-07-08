@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Line } from 'react-chartjs-2';
 import 'chart.js/auto';
+import ProfileFlipCard from './ProfileFlipCard';
+import ProfilePage from './ProfilePage';
 
 function App() {
   const [players, setPlayers] = useState([]);
@@ -27,6 +29,9 @@ function App() {
   const [storygraphUsername, setStorygraphUsername] = useState('');
   const [storygraphData, setStorygraphData] = useState(null);
   const [csvData, setCsvData] = useState('');
+
+  // Profile state
+  const [viewingProfile, setViewingProfile] = useState(null);
 
   // Fetch players and posts
   useEffect(() => {
@@ -285,6 +290,15 @@ function App() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Profile navigation
+  const handleProfileClick = (playerId) => {
+    setViewingProfile(playerId);
+  };
+
+  const handleBackToProfiles = () => {
+    setViewingProfile(null);
   };
 
   const current = players.find(p => p.id === selected) || { 
@@ -1050,6 +1064,56 @@ function App() {
     </div>
   );
 
+  const renderProfiles = () => {
+    if (viewingProfile) {
+      return (
+        <ProfilePage 
+          playerId={viewingProfile} 
+          currentUserId={selected} 
+          onBack={handleBackToProfiles} 
+        />
+      );
+    }
+
+    return (
+      <div>
+        <div style={styles.card}>
+          <h3 style={{ marginTop: 0 }}>👥 Player Profiles</h3>
+          <p style={{ color: '#6b7280', marginBottom: '20px' }}>
+            Discover other readers, view their progress, and start conversations. 
+            Click on a profile card to flip it and see the chat interface!
+          </p>
+        </div>
+        
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', 
+          gap: '20px',
+          justifyItems: 'center'
+        }}>
+          {players
+            .filter(player => player.id !== selected)
+            .map(player => (
+              <ProfileFlipCard
+                key={player.id}
+                player={player}
+                currentUserId={selected}
+                onProfileClick={handleProfileClick}
+              />
+            ))}
+        </div>
+        
+        {players.filter(player => player.id !== selected).length === 0 && (
+          <div style={{ ...styles.card, textAlign: 'center', padding: '40px' }}>
+            <p style={{ margin: 0, color: '#6b7280' }}>
+              🌟 No other players yet. Invite friends to join ReadStock!
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div style={styles.container}>
       {/* Header */}
@@ -1135,6 +1199,7 @@ function App() {
         {[
           { id: 'dashboard', label: '📊 Dashboard', icon: '📊' },
           { id: 'social', label: '🌟 Social Feed', icon: '🌟' },
+          { id: 'profiles', label: '🎭 Profiles', icon: '🎭' },
           { id: 'people', label: '👥 People', icon: '👥' },
           { id: 'storygraph', label: '📈 StoryGraph', icon: '📈' }
         ].map(tab => (
@@ -1155,6 +1220,7 @@ function App() {
       <div style={styles.content}>
         {currentTab === 'dashboard' && renderDashboard()}
         {currentTab === 'social' && renderSocialFeed()}
+        {currentTab === 'profiles' && renderProfiles()}
         {currentTab === 'people' && renderPeople()}
         {currentTab === 'storygraph' && renderStoryGraph()}
       </div>
