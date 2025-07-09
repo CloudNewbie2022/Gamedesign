@@ -5,6 +5,10 @@ const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const puppeteer = require('puppeteer');
+const multer = require('multer');
+const fs = require('fs');
+const path = require('path');
+const { spawn } = require('child_process');
 require('dotenv').config();
 
 // Import user management modules
@@ -15,6 +19,27 @@ const PasswordReset = require('./userManager/passwordReset');
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
+
+// Configure multer for file uploads
+const upload = multer({
+  dest: 'tmp/uploads/',
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Allow only image files
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'), false);
+    }
+  }
+});
+
+// Ensure upload directory exists
+if (!fs.existsSync('tmp/uploads/')) {
+  fs.mkdirSync('tmp/uploads/', { recursive: true });
+}
 
 // JWT secret (in production, use environment variable)
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
@@ -692,6 +717,165 @@ app.post('/import-storygraph', async (req, res) => {
   }
 });
 
+// OCR Import endpoint for StoryGraph images
+app.post('/import-storygraph-ocr', upload.fields([
+  { name: 'squareImage', maxCount: 1 },
+  { name: 'calendarImage', maxCount: 1 }
+]), async (req, res) => {
+  let squareImagePath = null;
+  let calendarImagePath = null;
+  
+  try {
+    // Check if both images were uploaded
+    if (!req.files || !req.files.squareImage || !req.files.calendarImage) {
+      return res.status(400).json({ 
+        error: 'Both square image and calendar image are required',
+        received: {
+          squareImage: !!(req.files && req.files.squareImage),
+          calendarImage: !!(req.files && req.files.calendarImage)
+        }
+      });
+    }
+    
+    squareImagePath = req.files.squareImage[0].path;
+    calendarImagePath = req.files.calendarImage[0].path;
+    
+    console.log(`📷 Processing OCR for square: ${squareImagePath}, calendar: ${calendarImagePath}`);
+    
+    // Helper function to run OCR scripts
+    const runOcrScript = (scriptPath, imagePath, isNode = true) => {
+      return new Promise((resolve, reject) => {
+        const command = isNode ? 'node' : 'python3';
+        const args = [scriptPath, imagePath];
+        
+        // For Python script, we need to use the virtual environment
+        const env = { ...process.env };
+        if (!isNode) {
+          env.PATH = `${path.join(__dirname, 'ocr_env', 'bin')}:${env.PATH}`;
+        }
+        
+        const child = spawn(command, args, { env });
+        let stdout = '';
+        let stderr = '';
+        
+        child.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+        
+        child.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+        
+        child.on('close', (code) => {
+          if (code === 0) {
+            try {
+              // Extract JSON from stdout
+              const jsonMatch = stdout.match(/\{[\s\S]*\}/);
+              if (jsonMatch) {
+                const result = JSON.parse(jsonMatch[0]);
+                resolve(result);
+              } else {
+                reject(new Error(`No JSON output found in ${scriptPath} stdout: ${stdout}`));
+              }
+            } catch (error) {
+              reject(new Error(`Failed to parse JSON from ${scriptPath}: ${error.message}`));
+            }
+          } else {
+            reject(new Error(`${scriptPath} failed with code ${code}: ${stderr}`));
+          }
+        });
+        
+        child.on('error', (error) => {
+          reject(new Error(`Failed to start ${scriptPath}: ${error.message}`));
+        });
+      });
+    };
+    
+    // Run both OCR scripts in parallel
+    const [squareResults, calendarResults] = await Promise.all([
+      runOcrScript(path.join(__dirname, 'tmp', 'ocr_square.js'), squareImagePath, true),
+      runOcrScript(path.join(__dirname, 'tmp', 'ocr_calendar.py'), calendarImagePath, false)
+    ]);
+    
+    console.log('🔍 Square OCR results:', squareResults);
+    console.log('📅 Calendar OCR results:', calendarResults);
+    
+    // Merge the results
+    const mergedResults = {
+      // From square image
+      bookTitles: squareResults.bookTitles || [],
+      totalBooks: squareResults.totalBooks || 0,
+      totalPages: squareResults.totalPages || 0,
+      averageTimeToFinish: squareResults.averageTimeToFinish || null,
+      averageBookLength: squareResults.averageBookLength || null,
+      genres: squareResults.genres || [],
+      
+      // From calendar image
+      month: calendarResults.month || null,
+      year: calendarResults.year || null,
+      readingDays: calendarResults.reading_days || [],
+      
+      // Generate daily pages array from calendar data (defaulting to 90 days)
+      dailyPages: generateDailyPagesArray(calendarResults.reading_days || []),
+      
+      // Calculate derived stats
+      booksRead: squareResults.totalBooks || 0,
+      pagesRead: squareResults.totalPages || 0,
+      
+      // Raw OCR data for debugging
+      rawSquareData: squareResults,
+      rawCalendarData: calendarResults
+    };
+    
+    console.log('✅ Merged OCR results:', mergedResults);
+    
+    res.json({
+      success: true,
+      message: 'OCR processing completed successfully',
+      data: mergedResults,
+      extractedFrom: {
+        squareImage: squareResults.error ? 'failed' : 'success',
+        calendarImage: calendarResults.error ? 'failed' : 'success'
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ OCR processing error:', error);
+    res.status(500).json({ 
+      error: 'OCR processing failed', 
+      message: error.message,
+      details: error.stack
+    });
+  } finally {
+    // Clean up uploaded files
+    const filesToDelete = [squareImagePath, calendarImagePath].filter(Boolean);
+    for (const filePath of filesToDelete) {
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch (error) {
+        console.error(`Failed to delete temp file ${filePath}:`, error);
+      }
+    }
+  }
+});
+
+// Helper function to generate daily pages array from calendar reading days
+function generateDailyPagesArray(readingDays, totalDays = 90) {
+  // Create array of zeros for the specified number of days
+  const dailyPages = new Array(totalDays).fill(0);
+  
+  // Fill in the reading days
+  readingDays.forEach(dayData => {
+    if (dayData.day >= 1 && dayData.day <= totalDays) {
+      dailyPages[dayData.day - 1] = dayData.pages || 0;
+    }
+  });
+  
+  return dailyPages;
+}
+
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`🚀 Rally Reader Server running on http://localhost:${PORT}`);
@@ -713,6 +897,7 @@ app.listen(PORT, () => {
   console.log(`   POST /buy - Buy shares in another user (Requires game unlocked)`);
   console.log(`   POST /sell - Sell shares (Requires game unlocked)`);
   console.log(`   POST /import-storygraph - Import StoryGraph stats`);
+  console.log(`   POST /import-storygraph-ocr - Import StoryGraph stats from images (OCR)`);
   console.log(`\n🔒 Game Locking System:`);
   console.log(`   - New users start with game locked`);
   console.log(`   - Must provide 90 days of reading data to unlock`);
