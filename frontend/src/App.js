@@ -100,15 +100,6 @@ function App() {
     }
   }, [darkMode]);
 
-  // Apply dark mode theme to document root
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.setAttribute('data-theme', 'dark');
-    } else {
-      document.documentElement.removeAttribute('data-theme');
-    }
-  }, [darkMode]);
-
   const handleLogin = (userData) => {
     setUser(userData);
   };

@@ -5,6 +5,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
+    "quick-start": "node start.js",
+    "frontend": "cd frontend && npm start",
     "test": "node test-game-lock.js",
     "backup": "node -e \"require('./userManager/userStorage').backupUsers()\""
   },
